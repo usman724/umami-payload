@@ -6,7 +6,6 @@ import path from 'path'
 import { buildConfig } from 'payload'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
-import { migrations } from './migrations'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
@@ -35,7 +34,8 @@ export default buildConfig({
     },
     // Use migrations in production, push:true for development
     push: process.env.NODE_ENV === 'development',
-    migrations: migrations,
+    // Specify migration directory - Payload will automatically run migrations
+    migrationDir: path.resolve(dirname, 'migrations'),
   }),
   sharp,
   plugins: [
