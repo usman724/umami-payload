@@ -24,4 +24,6 @@ const nextConfig = {
   },
 }
 
-export default withPayload(nextConfig, { devBundleServerPackages: false })
+// Bundle server packages (like payload) into the standalone output so the
+// payload CLI exists at .next/standalone/node_modules for migrations.
+export default withPayload(nextConfig, { devBundleServerPackages: true })
