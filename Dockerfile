@@ -60,15 +60,17 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy init script and payload config for migrations
-COPY --from=builder --chown=nextjs:nodejs /app/init-payload.js ./
-COPY --from=builder --chown=nextjs:nodejs /app/src ./src
-
 USER nextjs
 
 EXPOSE 3001
 
 ENV PORT 3001
 
-# Init Payload (creates DB schema with push:true), then start Next.js server
-CMD sh -c "node init-payload.js && HOSTNAME=0.0.0.0 node server.js"
+# Install curl for health check (needed to trigger Payload initialization)
+USER root
+RUN apk add --no-cache curl
+USER nextjs
+
+# Start server and initialize Payload by calling init endpoint
+# This ensures tables are created before first real request
+CMD sh -c "HOSTNAME=0.0.0.0 node server.js & sleep 8 && curl -f http://localhost:3001/api/init && echo '✅ Payload initialized' || echo '⚠️  Init check failed (server still running)'; wait"
