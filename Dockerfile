@@ -73,4 +73,5 @@ USER nextjs
 
 # Start server and initialize Payload by calling init endpoint
 # This ensures tables are created before first real request
-CMD sh -c "HOSTNAME=0.0.0.0 node server.js & sleep 8 && curl -f http://localhost:3001/api/init && echo '✅ Payload initialized' || echo '⚠️  Init check failed (server still running)'; wait"
+# Wait longer for Next.js to fully start, then retry init endpoint
+CMD sh -c "HOSTNAME=0.0.0.0 node server.js & sleep 15 && for i in 1 2 3; do curl -f http://localhost:3001/api/init && echo '✅ Payload initialized' && break || sleep 5; done; wait"
