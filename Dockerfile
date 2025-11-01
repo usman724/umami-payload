@@ -66,6 +66,8 @@ EXPOSE 3001
 
 ENV PORT 3001
 
+# Run migrations on startup (Payload 3.0 should auto-migrate, but this ensures it)
+# Note: In production, you may want to run migrations separately before starting
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
 CMD HOSTNAME="0.0.0.0" node server.js
