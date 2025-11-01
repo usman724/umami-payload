@@ -238,10 +238,10 @@ export class UmamiService {
       data: {
         email: userData.email,
         password: userData.password,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        role: userData.role || 'user',
-        tenant: tenantId,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      role: userData.role || 'user',
+      tenant: typeof tenantId === 'string' ? parseInt(tenantId, 10) : tenantId,
       },
     })
   }

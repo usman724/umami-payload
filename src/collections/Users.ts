@@ -12,7 +12,6 @@ export const Users: CollectionConfig = {
       type: 'relationship',
       relationTo: 'tenants',
       label: 'Tenant',
-      description: 'The tenant organization this user belongs to',
       admin: {
         position: 'sidebar',
       },
@@ -37,7 +36,6 @@ export const Users: CollectionConfig = {
         },
       ],
       label: 'Role',
-      description: 'User role within the tenant',
     },
     {
       name: 'firstName',

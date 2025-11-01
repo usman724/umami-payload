@@ -12,7 +12,6 @@ export const Tenants: CollectionConfig = {
       type: 'text',
       required: true,
       label: 'Tenant Name',
-      description: 'The name of the organization or company',
     },
     {
       name: 'domain',
@@ -20,13 +19,11 @@ export const Tenants: CollectionConfig = {
       required: true,
       unique: true,
       label: 'Domain',
-      description: 'Primary domain for this tenant (e.g., example.com)',
     },
     {
       name: 'umamiWebsiteId',
       type: 'text',
       label: 'Umami Website ID',
-      description: 'The Umami website ID for this tenant',
       admin: {
         readOnly: true,
       },
@@ -35,7 +32,6 @@ export const Tenants: CollectionConfig = {
       name: 'umamiApiKey',
       type: 'text',
       label: 'Umami API Key',
-      description: 'API key for accessing Umami data for this tenant',
       admin: {
         readOnly: true,
       },
@@ -60,7 +56,6 @@ export const Tenants: CollectionConfig = {
         },
       ],
       label: 'Status',
-      description: 'Current status of the tenant',
     },
     {
       name: 'settings',
@@ -72,21 +67,18 @@ export const Tenants: CollectionConfig = {
           type: 'checkbox',
           defaultValue: false,
           label: 'Allow Public Analytics',
-          description: 'Allow public access to analytics dashboard',
         },
         {
           name: 'maxWebsites',
           type: 'number',
           defaultValue: 5,
           label: 'Maximum Websites',
-          description: 'Maximum number of websites this tenant can track',
         },
         {
           name: 'retentionDays',
           type: 'number',
           defaultValue: 90,
           label: 'Data Retention (Days)',
-          description: 'How long to keep analytics data',
         },
       ],
     },
