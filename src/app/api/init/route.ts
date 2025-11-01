@@ -1,5 +1,5 @@
 import { getPayload } from 'payload'
-import config from '../../payload.config'
+import config from '../../../payload.config'
 import { NextResponse } from 'next/server'
 
 // This endpoint forces Payload to initialize, which will trigger push:true
