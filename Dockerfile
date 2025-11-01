@@ -60,14 +60,15 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copy init script and payload config for migrations
+COPY --from=builder --chown=nextjs:nodejs /app/init-payload.js ./
+COPY --from=builder --chown=nextjs:nodejs /app/src ./src
+
 USER nextjs
 
 EXPOSE 3001
 
 ENV PORT 3001
 
-# Run migrations on startup using the standalone payload binary, then start server
-# The standalone output contains payload in .next/standalone/node_modules
-# and the compiled config at .next/standalone/src/payload.config.js
-# If migration command is not found or fails, continue to start the server.
-CMD sh -c "node .next/standalone/node_modules/payload/dist/bin/payload migrate --config .next/standalone/src/payload.config.js || echo 'Skipping migrations'; HOSTNAME=0.0.0.0 node server.js"
+# Init Payload (creates DB schema with push:true), then start Next.js server
+CMD sh -c "node init-payload.js && HOSTNAME=0.0.0.0 node server.js"

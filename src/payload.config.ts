@@ -32,7 +32,9 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URI || '',
     },
-    push: true, // Enable automatic migrations on startup
+    // Auto-push schema changes (creates/updates tables automatically)
+    // Set to true to enable automatic migrations in all environments
+    push: true,
   }),
   sharp,
   plugins: [
