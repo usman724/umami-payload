@@ -2,31 +2,44 @@ import { getPayload } from 'payload'
 import config from '../../../payload.config'
 import { NextResponse } from 'next/server'
 
-// This endpoint forces Payload to initialize, which will trigger push:true
-// Call this on container startup to ensure tables are created before first request
+// This endpoint forces Payload to initialize and create database schema
+// Key insight: push:true runs when the adapter connects, but connection is lazy
+// We force connection by accessing the database adapter's connection pool
 export async function GET() {
   try {
     console.log('🔄 Initializing Payload CMS via /api/init endpoint...')
     console.log('📊 DATABASE_URI:', process.env.DATABASE_URI ? 'Set' : 'Not set')
     
-    // Get Payload instance - this will trigger initialization and push:true
+    // Get Payload instance
     const payload = await getPayload({ config })
     
-    // Wait a moment to ensure initialization completes
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // CRITICAL: Force database connection by accessing the adapter's pool
+    // This triggers push:true to run and create tables
+    console.log('🔌 Forcing database connection...')
     
-    // Force a database operation to ensure connection is established
-    // This will trigger push:true to create tables if they don't exist
+    if (payload.db && 'connect' in payload.db) {
+      // Try to access connection - this should trigger push:true
+      const adapter = payload.db as any
+      if (adapter.pool) {
+        // Access the pool to force connection
+        await adapter.pool.query('SELECT 1')
+        console.log('✅ Database pool accessed - connection established')
+      }
+    }
+    
+    // Wait for push:true to complete schema creation
+    console.log('⏳ Waiting for schema creation (push:true)...')
+    await new Promise(resolve => setTimeout(resolve, 5000))
+    
+    // Now verify tables exist by querying
     try {
-      // Try to count users - this will trigger DB connection and schema creation
       const result = await payload.count({
         collection: 'users',
       })
-      console.log('✅ Database connection established. Users count:', result.totalDocs)
+      console.log('✅ Database tables created! Users count:', result.totalDocs)
     } catch (dbError: any) {
-      // If this fails, push:true should have already created tables
-      // The error might be expected if tables are being created
-      console.log('📊 Database operation result:', dbError.message)
+      console.error('❌ Database query failed:', dbError.message)
+      throw new Error(`Database tables not created: ${dbError.message}`)
     }
     
     console.log('✅ Payload initialized successfully')
@@ -40,7 +53,8 @@ export async function GET() {
     console.error('❌ Failed to initialize Payload:', error)
     return NextResponse.json({ 
       success: false, 
-      error: error.message 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     }, { status: 500 })
   }
 }
