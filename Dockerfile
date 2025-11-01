@@ -66,8 +66,8 @@ EXPOSE 3001
 
 ENV PORT 3001
 
-# Run migrations on startup (Payload 3.0 should auto-migrate, but this ensures it)
-# Note: In production, you may want to run migrations separately before starting
-# server.js is created by next build from the standalone output
-# https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD HOSTNAME="0.0.0.0" node server.js
+# Run migrations on startup using the standalone payload binary, then start server
+# The standalone output contains payload in .next/standalone/node_modules
+# and the compiled config at .next/standalone/src/payload.config.js
+# If migration command is not found or fails, continue to start the server.
+CMD sh -c "node .next/standalone/node_modules/payload/dist/bin/payload migrate --config .next/standalone/src/payload.config.js || echo 'Skipping migrations'; HOSTNAME=0.0.0.0 node server.js"
