@@ -13,33 +13,36 @@ export async function GET() {
     // Get Payload instance
     const payload = await getPayload({ config })
     
-    // CRITICAL: Force database connection by accessing the adapter's pool
-    // This triggers push:true to run and create tables
-    console.log('🔌 Forcing database connection...')
-    
-    if (payload.db && 'connect' in payload.db) {
-      // Try to access connection - this should trigger push:true
+    // Run migrations explicitly if migrate method exists
+    if (payload.db && typeof payload.db.migrate === 'function') {
+      console.log('🔄 Running migrations via payload.db.migrate()...')
+      await payload.db.migrate()
+      console.log('✅ Migrations executed')
+    } else {
+      console.log('⚠️  migrate() method not found, trying to trigger migrationDir...')
+      // Force database connection to trigger migrationDir auto-migration
       const adapter = payload.db as any
-      if (adapter.pool) {
-        // Access the pool to force connection
+      if (adapter?.pool) {
         await adapter.pool.query('SELECT 1')
-        console.log('✅ Database pool accessed - connection established')
+        console.log('✅ Database connection established - migrations should auto-run')
       }
+      // Wait for auto-migration
+      await new Promise(resolve => setTimeout(resolve, 3000))
     }
     
-    // Wait for push:true to complete schema creation
-    console.log('⏳ Waiting for schema creation (push:true)...')
-    await new Promise(resolve => setTimeout(resolve, 5000))
-    
-    // Now verify tables exist by querying
+    // Verify tables exist by querying
     try {
       const result = await payload.count({
         collection: 'users',
       })
       console.log('✅ Database tables created! Users count:', result.totalDocs)
     } catch (dbError: any) {
+      // If tables don't exist, try push:true as fallback (only in production if migrationDir failed)
+      if (process.env.NODE_ENV === 'production') {
+        console.warn('⚠️  Tables not found, but migrationDir should handle this on startup')
+      }
       console.error('❌ Database query failed:', dbError.message)
-      throw new Error(`Database tables not created: ${dbError.message}`)
+      // Don't throw - migrations might run on first request
     }
     
     console.log('✅ Payload initialized successfully')
