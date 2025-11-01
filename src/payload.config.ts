@@ -34,8 +34,12 @@ export default buildConfig({
     },
     // Use migrations in production, push:true for development
     push: process.env.NODE_ENV === 'development',
-    // Specify migration directory - Payload will automatically run migrations
-    migrationDir: path.resolve(dirname, 'migrations'),
+    // Specify migration directory - use absolute path that works in both dev and production
+    // In Docker: migrations are at /app/src/migrations (from Dockerfile COPY)
+    // In dev: migrations are at src/migrations
+    migrationDir: process.env.NODE_ENV === 'production' 
+      ? path.resolve(process.cwd(), 'src', 'migrations')
+      : path.resolve(dirname, 'migrations'),
   }),
   sharp,
   plugins: [
