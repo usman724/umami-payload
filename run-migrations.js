@@ -18,16 +18,72 @@ async function runMigrations() {
     console.log('📊 DATABASE_URI:', process.env.DATABASE_URI ? 'Set' : 'Not set')
     
     // Try to load payload from standalone first, then regular node_modules
+    // In Docker standalone build, payload is at .next/standalone/node_modules/payload
     let getPayload
+    const standaloneNodeModules = path.resolve(__dirname, '.next/standalone/node_modules')
+    const standalonePayloadPath = path.join(standaloneNodeModules, 'payload')
+    
+    // Set NODE_PATH to include standalone node_modules for module resolution
+    const originalNodePath = process.env.NODE_PATH || ''
+    process.env.NODE_PATH = [
+      standaloneNodeModules,
+      path.resolve(__dirname, 'node_modules'),
+      originalNodePath
+    ].filter(Boolean).join(':')
+    
     try {
-      const payloadPath = require.resolve('payload', { paths: [path.resolve(__dirname, '.next/standalone/node_modules'), __dirname] })
-      const payloadModule = await import(payloadPath)
-      getPayload = payloadModule.getPayload || payloadModule.default?.getPayload
-      console.log('✅ Loaded Payload from:', payloadPath)
+      // Try standalone build first (production Docker)
+      if (fs.existsSync(standalonePayloadPath)) {
+        // Try the dist/index.js entry point
+        const payloadDistPath = path.join(standalonePayloadPath, 'dist/index.js')
+        if (fs.existsSync(payloadDistPath)) {
+          const payloadModule = await import('file://' + payloadDistPath)
+          getPayload = payloadModule.getPayload || payloadModule.default?.getPayload
+          console.log('✅ Loaded Payload from standalone dist:', payloadDistPath)
+        } else {
+          // Try package.json main entry
+          const payloadPkgPath = path.join(standalonePayloadPath, 'package.json')
+          if (fs.existsSync(payloadPkgPath)) {
+            const pkg = JSON.parse(fs.readFileSync(payloadPkgPath, 'utf8'))
+            const mainPath = path.join(standalonePayloadPath, pkg.main || 'dist/index.js')
+            const payloadModule = await import('file://' + mainPath)
+            getPayload = payloadModule.getPayload || payloadModule.default?.getPayload
+            console.log('✅ Loaded Payload from standalone package.json main:', mainPath)
+          } else {
+            throw new Error('Standalone payload package.json not found')
+          }
+        }
+      } else {
+        throw new Error('Standalone payload directory not found')
+      }
     } catch (e) {
-      const payloadModule = await import('payload')
-      getPayload = payloadModule.getPayload || payloadModule.default?.getPayload
-      console.log('✅ Loaded Payload from node_modules')
+      console.warn('⚠️  Could not load from standalone, trying resolved path:', e.message)
+      try {
+        // Fallback: use require.resolve with createRequire for better path resolution
+        const payloadResolved = require.resolve('payload', { 
+          paths: [
+            standaloneNodeModules,
+            path.resolve(__dirname, 'node_modules'),
+            __dirname
+          ] 
+        })
+        const payloadModule = await import('file://' + payloadResolved)
+        getPayload = payloadModule.getPayload || payloadModule.default?.getPayload
+        console.log('✅ Loaded Payload from resolved path:', payloadResolved)
+      } catch (e2) {
+        console.warn('⚠️  Resolved path failed, trying direct import:', e2.message)
+        // Last resort: try direct import (with NODE_PATH set, should work)
+        try {
+          const payloadModule = await import('payload')
+          getPayload = payloadModule.getPayload || payloadModule.default?.getPayload
+          console.log('✅ Loaded Payload from direct import')
+        } catch (e3) {
+          throw new Error(`Failed to load payload package. Tried: standalone dist, package.json main, resolved, direct. Last error: ${e3.message}`)
+        }
+      }
+    } finally {
+      // Restore original NODE_PATH
+      process.env.NODE_PATH = originalNodePath || undefined
     }
     
     // Load config - in production, config is in standalone build
