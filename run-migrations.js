@@ -57,7 +57,7 @@ async function runMigrations() {
         collection: 'users',
       })
       console.log('✅ Migrations completed! Users count:', result.totalDocs)
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Tables not created:', error.message)
       throw error
     }
@@ -69,7 +69,7 @@ async function runMigrations() {
     
     console.log('✅ All migrations completed successfully!')
     process.exit(0)
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Migration failed:', error.message)
     if (error.stack) {
       console.error(error.stack)
