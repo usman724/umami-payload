@@ -60,6 +60,10 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copy migration script
+COPY --from=builder --chown=nextjs:nodejs /app/run-migrations.js ./
+COPY --from=builder --chown=nextjs:nodejs /app/src ./src
+
 USER nextjs
 
 EXPOSE 3001
@@ -71,7 +75,6 @@ USER root
 RUN apk add --no-cache curl
 USER nextjs
 
-# Start server and initialize Payload by calling init endpoint
-# This ensures tables are created before first real request
-# Wait longer for Next.js to fully start, then retry init endpoint
-CMD sh -c "HOSTNAME=0.0.0.0 node server.js & sleep 15 && for i in 1 2 3; do curl -f http://localhost:3001/api/init && echo '✅ Payload initialized' && break || sleep 5; done; wait"
+# Run migrations first, then start server
+# Migrations will run automatically via Payload's migrate() method
+CMD sh -c "node run-migrations.js && echo '✅ Migrations completed' && HOSTNAME=0.0.0.0 node server.js"

@@ -6,6 +6,7 @@ import path from 'path'
 import { buildConfig } from 'payload'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
+import { migrations } from './migrations'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
@@ -32,9 +33,9 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URI || '',
     },
-    // Auto-push schema changes (creates/updates tables automatically)
-    // Set to true to enable automatic migrations in all environments
-    push: true,
+    // Use migrations in production, push:true for development
+    push: process.env.NODE_ENV === 'development',
+    migrations: migrations,
   }),
   sharp,
   plugins: [
