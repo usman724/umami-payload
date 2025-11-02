@@ -42,21 +42,36 @@ export class UmamiService {
    * Authenticate with Umami and get JWT token
    */
   async authenticate(username: string, password: string): Promise<UmamiAuthResponse> {
-    const response = await fetch(`${this.baseUrl}/api/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password }),
-    })
+    const url = `${this.baseUrl}/api/auth/login`
+    console.log(`🔐 Attempting to authenticate with Umami at: ${url}`)
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      })
 
-    if (!response.ok) {
-      throw new Error(`Authentication failed: ${response.statusText}`)
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`❌ Umami authentication failed: ${response.status} ${response.statusText}`)
+        console.error(`   URL: ${url}`)
+        console.error(`   Response: ${errorText}`)
+        throw new Error(`Authentication failed: ${response.status} ${response.statusText}. ${errorText}`)
+      }
+
+      const data = await response.json()
+      this.authToken = data.token
+      console.log(`✅ Umami authentication successful`)
+      return data
+    } catch (error: any) {
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error(`Failed to connect to Umami at ${url}. Is Umami running? Error: ${error.message}`)
+      }
+      throw error
     }
-
-    const data = await response.json()
-    this.authToken = data.token
-    return data
   }
 
   /**
@@ -167,8 +182,12 @@ export class UmamiService {
   }): Promise<{ tenant: any; umamiWebsite: UmamiWebsite }> {
     const payload = await getPayload({ config })
 
-    // Authenticate with Umami using admin credentials
-    await this.authenticate('admin', 'umami')
+    // Authenticate with Umami using credentials from environment variables
+    const umamiUsername = process.env.UMAMI_ADMIN_USERNAME || 'admin'
+    const umamiPassword = process.env.UMAMI_ADMIN_PASSWORD || 'umami'
+    
+    console.log(`🔐 Authenticating with Umami at ${this.baseUrl}/api/auth/login`)
+    await this.authenticate(umamiUsername, umamiPassword)
 
     // Create website in Umami
     const umamiWebsite = await this.createWebsite(
@@ -214,8 +233,10 @@ export class UmamiService {
       throw new Error('Tenant does not have an associated Umami website')
     }
 
-    // Authenticate with Umami
-    await this.authenticate('admin', 'umami')
+    // Authenticate with Umami using credentials from environment variables
+    const umamiUsername = process.env.UMAMI_ADMIN_USERNAME || 'admin'
+    const umamiPassword = process.env.UMAMI_ADMIN_PASSWORD || 'umami'
+    await this.authenticate(umamiUsername, umamiPassword)
 
     // Get analytics data
     return await this.getAnalytics(tenant.umamiWebsiteId, startDate, endDate)
