@@ -32,13 +32,15 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URI || '',
     },
-    // Temporarily use push:true in production to auto-create schema
-    // TODO: Once migrations are compiled to JS, switch back to migrationDir
-    push: true, // Auto-create schema on first connection
-    // migrationDir is disabled until we can compile TS migrations to JS
-    // migrationDir: process.env.NODE_ENV === 'production' 
-    //   ? path.resolve(process.cwd(), 'src', 'migrations')
-    //   : path.resolve(dirname, 'migrations'),
+    // Use push:true in development, migrations in production
+    push: process.env.NODE_ENV === 'development',
+    // Use prodMigrations in production - runs migrations at runtime
+    // This works because Next.js compiles TS to JS during build
+    ...(process.env.NODE_ENV === 'production' && { prodMigrations: migrations }),
+    // migrationDir for development when using CLI
+    ...(process.env.NODE_ENV === 'development' && {
+      migrationDir: path.resolve(dirname, 'migrations'),
+    }),
   }),
   sharp,
   plugins: [
