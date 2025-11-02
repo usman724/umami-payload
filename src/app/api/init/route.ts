@@ -13,52 +13,63 @@ export async function GET() {
     // Get Payload instance
     const payload = await getPayload({ config })
     
-    // Force database connection and schema creation
-    console.log('🔌 Forcing database connection and schema creation (push:true)...')
+    // Force database connection and schema creation via push:true
+    console.log('🔌 Triggering schema creation with push:true...')
     
-    // Try to access a collection - this will trigger push:true to create tables
-    try {
-      // This will trigger schema creation if tables don't exist
-      const result = await payload.count({
-        collection: 'users',
-      })
-      console.log('✅ Database tables exist! Users count:', result.totalDocs)
-    } catch (dbError: any) {
-      // If tables don't exist, push:true should create them
-      // Wait a bit for schema creation to complete
-      console.log('⏳ Tables not found, waiting for push:true to create schema...')
-      await new Promise(resolve => setTimeout(resolve, 5000))
+    // Access the adapter directly to ensure connection
+    const adapter = payload.db as any
+    if (adapter?.pool) {
+      // Establish connection first
+      await adapter.pool.query('SELECT 1')
+      console.log('✅ Database connection established')
       
-      // Try again after waiting
+      // Give adapter time to run push:true
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+    
+    // Now try to access a collection - this should trigger push:true if not already done
+    let retries = 3
+    let lastError: any = null
+    
+    while (retries > 0) {
       try {
         const result = await payload.count({
           collection: 'users',
         })
         console.log('✅ Database tables created! Users count:', result.totalDocs)
-      } catch (retryError: any) {
-        console.error('❌ Database tables still not created after push:true attempt')
-        console.error('Error:', retryError.message)
+        break // Success!
+      } catch (dbError: any) {
+        lastError = dbError
+        retries--
         
-        // Force schema push by accessing the adapter directly
-        const adapter = payload.db as any
-        if (adapter?.push) {
-          console.log('🔄 Attempting manual schema push...')
-          try {
-            await adapter.push()
-            console.log('✅ Manual schema push completed')
-            
-            // Wait and verify again
-            await new Promise(resolve => setTimeout(resolve, 3000))
-            const verifyResult = await payload.count({ collection: 'users' })
-            console.log('✅ Schema verified! Users count:', verifyResult.totalDocs)
-          } catch (pushError: any) {
-            console.error('❌ Manual schema push failed:', pushError.message)
-            throw pushError
-          }
+        if (retries > 0) {
+          console.log(`⏳ Tables not found yet, waiting for push:true... (${retries} retries left)`)
+          await new Promise(resolve => setTimeout(resolve, 4000))
         } else {
-          throw retryError
+          console.error('❌ Failed to create tables after multiple attempts')
+          console.error('Error:', dbError.message)
+          
+          // Last resort: check if push happened but failed silently
+          const adapter = payload.db as any
+          if (adapter?.migrate) {
+            console.log('🔄 Trying migrate() as alternative...')
+            try {
+              await adapter.migrate()
+              await new Promise(resolve => setTimeout(resolve, 3000))
+              const verifyResult = await payload.count({ collection: 'users' })
+              console.log('✅ Schema created via migrate()! Users count:', verifyResult.totalDocs)
+            } catch (migrateError: any) {
+              throw new Error(`Schema creation failed. push:true and migrate() both failed. Last error: ${migrateError.message}`)
+            }
+          } else {
+            throw new Error(`Schema creation failed. Tables don't exist and push:true didn't create them. Error: ${dbError.message}`)
+          }
         }
       }
+    }
+    
+    if (lastError && retries === 0) {
+      throw lastError
     }
     
     console.log('✅ Payload initialized successfully')
