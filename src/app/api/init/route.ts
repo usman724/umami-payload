@@ -16,15 +16,28 @@ export async function GET() {
     // Force database connection and schema creation via push:true
     console.log('🔌 Triggering schema creation with push:true...')
     
-    // Access the adapter directly to ensure connection
+    // Access the adapter directly and trigger push explicitly
     const adapter = payload.db as any
+    
+    // Check if adapter has a push method we can call directly
+    if (adapter?.push && typeof adapter.push === 'function') {
+      console.log('🔄 Calling adapter.push() directly...')
+      try {
+        await adapter.push()
+        console.log('✅ adapter.push() completed')
+        // Wait for push to finish
+        await new Promise(resolve => setTimeout(resolve, 5000))
+      } catch (pushError: any) {
+        console.warn('⚠️  Direct push() call failed:', pushError.message)
+      }
+    }
+    
+    // Also establish connection to trigger lazy initialization
     if (adapter?.pool) {
-      // Establish connection first
       await adapter.pool.query('SELECT 1')
       console.log('✅ Database connection established')
-      
-      // Give adapter time to run push:true
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Wait for any async push operations
+      await new Promise(resolve => setTimeout(resolve, 3000))
     }
     
     // Now try to access a collection - this should trigger push:true if not already done
@@ -33,43 +46,40 @@ export async function GET() {
     
     while (retries > 0) {
       try {
-        const result = await payload.count({
+        // Try find instead of count - sometimes this triggers schema creation better
+        const result = await payload.find({
           collection: 'users',
+          limit: 0, // Just check if table exists
         })
-        console.log('✅ Database tables created! Users count:', result.totalDocs)
+        console.log('✅ Database tables created! Users found:', result.totalDocs)
         break // Success!
       } catch (dbError: any) {
         lastError = dbError
-        retries--
         
-        if (retries > 0) {
-          console.log(`⏳ Tables not found yet, waiting for push:true... (${retries} retries left)`)
-          await new Promise(resolve => setTimeout(resolve, 4000))
-        } else {
-          console.error('❌ Failed to create tables after multiple attempts')
-          console.error('Error:', dbError.message)
+        // If error is "relation does not exist", tables aren't created yet
+        if (dbError.message?.includes('does not exist') || dbError.cause?.code === '42P01') {
+          retries--
           
-          // Last resort: check if push happened but failed silently
-          const adapter = payload.db as any
-          if (adapter?.migrate) {
-            console.log('🔄 Trying migrate() as alternative...')
-            try {
-              await adapter.migrate()
-              await new Promise(resolve => setTimeout(resolve, 3000))
-              const verifyResult = await payload.count({ collection: 'users' })
-              console.log('✅ Schema created via migrate()! Users count:', verifyResult.totalDocs)
-            } catch (migrateError: any) {
-              throw new Error(`Schema creation failed. push:true and migrate() both failed. Last error: ${migrateError.message}`)
+          if (retries > 0) {
+            console.log(`⏳ Tables not found yet, waiting for push:true... (${retries} retries left)`)
+            // Try to trigger push again by accessing adapter
+            if (adapter?.push && typeof adapter.push === 'function') {
+              try {
+                await adapter.push()
+                console.log('🔄 Retry: Called adapter.push() again')
+              } catch (e) {
+                console.warn('⚠️  Retry push failed:', e.message)
+              }
             }
+            await new Promise(resolve => setTimeout(resolve, 5000))
           } else {
-            throw new Error(`Schema creation failed. Tables don't exist and push:true didn't create them. Error: ${dbError.message}`)
+            throw new Error(`Schema creation failed. push:true didn't create tables after ${3} attempts. Error: ${dbError.message}`)
           }
+        } else {
+          // Different error - throw immediately
+          throw dbError
         }
       }
-    }
-    
-    if (lastError && retries === 0) {
-      throw lastError
     }
     
     console.log('✅ Payload initialized successfully')
