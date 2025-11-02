@@ -16,28 +16,44 @@ export async function GET() {
     // Force database connection and schema creation via push:true
     console.log('🔌 Triggering schema creation with push:true...')
     
-    // Access the adapter directly and trigger push explicitly
+    // Access the adapter directly
     const adapter = payload.db as any
     
-    // Check if adapter has a push method we can call directly
-    if (adapter?.push && typeof adapter.push === 'function') {
-      console.log('🔄 Calling adapter.push() directly...')
-      try {
-        await adapter.push()
-        console.log('✅ adapter.push() completed')
-        // Wait for push to finish
-        await new Promise(resolve => setTimeout(resolve, 5000))
-      } catch (pushError: any) {
-        console.warn('⚠️  Direct push() call failed:', pushError.message)
-      }
-    }
+    // Log adapter methods for debugging
+    console.log('📋 Adapter methods available:', Object.keys(adapter || {}))
+    console.log('📋 Adapter.push type:', typeof adapter?.push)
+    console.log('📋 Adapter.pool exists:', !!adapter?.pool)
     
-    // Also establish connection to trigger lazy initialization
+    // Establish connection first
     if (adapter?.pool) {
       await adapter.pool.query('SELECT 1')
       console.log('✅ Database connection established')
-      // Wait for any async push operations
-      await new Promise(resolve => setTimeout(resolve, 3000))
+    }
+    
+    // Try to trigger push by accessing a collection
+    // This should automatically trigger push:true if enabled
+    console.log('🔄 Attempting to access users collection to trigger push:true...')
+    try {
+      // This query should trigger push:true automatically
+      const testResult = await payload.find({
+        collection: 'users',
+        limit: 0,
+        where: {
+          id: {
+            exists: false, // This will fail but might trigger push
+          },
+        },
+      })
+      console.log('✅ Collection access succeeded (tables exist)')
+    } catch (triggerError: any) {
+      // If it's a "does not exist" error, push:true should create tables
+      if (triggerError.message?.includes('does not exist') || triggerError.cause?.code === '42P01') {
+        console.log('⏳ Tables don\'t exist, push:true should create them now...')
+        // Wait for push:true to complete
+        await new Promise(resolve => setTimeout(resolve, 8000))
+      } else {
+        console.warn('⚠️  Unexpected error:', triggerError.message)
+      }
     }
     
     // Now try to access a collection - this should trigger push:true if not already done
