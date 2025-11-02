@@ -30,33 +30,7 @@ export async function GET() {
       console.log('✅ Database connection established')
     }
     
-    // Try to trigger push by accessing a collection
-    // This should automatically trigger push:true if enabled
-    console.log('🔄 Attempting to access users collection to trigger push:true...')
-    try {
-      // This query should trigger push:true automatically
-      const testResult = await payload.find({
-        collection: 'users',
-        limit: 0,
-        where: {
-          id: {
-            exists: false, // This will fail but might trigger push
-          },
-        },
-      })
-      console.log('✅ Collection access succeeded (tables exist)')
-    } catch (triggerError: any) {
-      // If it's a "does not exist" error, push:true should create tables
-      if (triggerError.message?.includes('does not exist') || triggerError.cause?.code === '42P01') {
-        console.log('⏳ Tables don\'t exist, push:true should create them now...')
-        // Wait for push:true to complete
-        await new Promise(resolve => setTimeout(resolve, 8000))
-      } else {
-        console.warn('⚠️  Unexpected error:', triggerError.message)
-      }
-    }
-    
-    // Now try to access a collection - this should trigger push:true if not already done
+    // Try to access a collection - this should trigger push:true automatically
     let retries = 3
     let lastError: any = null
     
@@ -83,8 +57,8 @@ export async function GET() {
               try {
                 await adapter.push()
                 console.log('🔄 Retry: Called adapter.push() again')
-              } catch (e) {
-                console.warn('⚠️  Retry push failed:', e.message)
+              } catch (e: any) {
+                console.warn('⚠️  Retry push failed:', e?.message || String(e))
               }
             }
             await new Promise(resolve => setTimeout(resolve, 5000))
