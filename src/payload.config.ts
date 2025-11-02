@@ -32,14 +32,13 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URI || '',
     },
-    // Use migrations in production, push:true for development
-    push: process.env.NODE_ENV === 'development',
-    // Specify migration directory - use absolute path that works in both dev and production
-    // In Docker: migrations are at /app/src/migrations (from Dockerfile COPY)
-    // In dev: migrations are at src/migrations
-    migrationDir: process.env.NODE_ENV === 'production' 
-      ? path.resolve(process.cwd(), 'src', 'migrations')
-      : path.resolve(dirname, 'migrations'),
+    // Temporarily use push:true in production to auto-create schema
+    // TODO: Once migrations are compiled to JS, switch back to migrationDir
+    push: true, // Auto-create schema on first connection
+    // migrationDir is disabled until we can compile TS migrations to JS
+    // migrationDir: process.env.NODE_ENV === 'production' 
+    //   ? path.resolve(process.cwd(), 'src', 'migrations')
+    //   : path.resolve(dirname, 'migrations'),
   }),
   sharp,
   plugins: [

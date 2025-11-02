@@ -13,22 +13,17 @@ export async function GET() {
     // Get Payload instance
     const payload = await getPayload({ config })
     
-    // Run migrations explicitly if migrate method exists
-    if (payload.db && typeof payload.db.migrate === 'function') {
-      console.log('🔄 Running migrations via payload.db.migrate()...')
-      await payload.db.migrate()
-      console.log('✅ Migrations executed')
-    } else {
-      console.log('⚠️  migrate() method not found, trying to trigger migrationDir...')
-      // Force database connection to trigger migrationDir auto-migration
-      const adapter = payload.db as any
-      if (adapter?.pool) {
-        await adapter.pool.query('SELECT 1')
-        console.log('✅ Database connection established - migrations should auto-run')
-      }
-      // Wait for auto-migration
-      await new Promise(resolve => setTimeout(resolve, 3000))
+    // Force database connection to trigger push:true schema creation
+    console.log('🔌 Forcing database connection to trigger push:true...')
+    const adapter = payload.db as any
+    if (adapter?.pool) {
+      await adapter.pool.query('SELECT 1')
+      console.log('✅ Database connection established')
     }
+    
+    // Wait for push:true to complete schema creation
+    console.log('⏳ Waiting for schema creation (push:true)...')
+    await new Promise(resolve => setTimeout(resolve, 3000))
     
     // Verify tables exist by querying
     try {
