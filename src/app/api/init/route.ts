@@ -13,31 +13,52 @@ export async function GET() {
     // Get Payload instance
     const payload = await getPayload({ config })
     
-    // Force database connection to trigger push:true schema creation
-    console.log('🔌 Forcing database connection to trigger push:true...')
-    const adapter = payload.db as any
-    if (adapter?.pool) {
-      await adapter.pool.query('SELECT 1')
-      console.log('✅ Database connection established')
-    }
+    // Force database connection and schema creation
+    console.log('🔌 Forcing database connection and schema creation (push:true)...')
     
-    // Wait for push:true to complete schema creation
-    console.log('⏳ Waiting for schema creation (push:true)...')
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    
-    // Verify tables exist by querying
+    // Try to access a collection - this will trigger push:true to create tables
     try {
+      // This will trigger schema creation if tables don't exist
       const result = await payload.count({
         collection: 'users',
       })
-      console.log('✅ Database tables created! Users count:', result.totalDocs)
+      console.log('✅ Database tables exist! Users count:', result.totalDocs)
     } catch (dbError: any) {
-      // If tables don't exist, try push:true as fallback (only in production if migrationDir failed)
-      if (process.env.NODE_ENV === 'production') {
-        console.warn('⚠️  Tables not found, but migrationDir should handle this on startup')
+      // If tables don't exist, push:true should create them
+      // Wait a bit for schema creation to complete
+      console.log('⏳ Tables not found, waiting for push:true to create schema...')
+      await new Promise(resolve => setTimeout(resolve, 5000))
+      
+      // Try again after waiting
+      try {
+        const result = await payload.count({
+          collection: 'users',
+        })
+        console.log('✅ Database tables created! Users count:', result.totalDocs)
+      } catch (retryError: any) {
+        console.error('❌ Database tables still not created after push:true attempt')
+        console.error('Error:', retryError.message)
+        
+        // Force schema push by accessing the adapter directly
+        const adapter = payload.db as any
+        if (adapter?.push) {
+          console.log('🔄 Attempting manual schema push...')
+          try {
+            await adapter.push()
+            console.log('✅ Manual schema push completed')
+            
+            // Wait and verify again
+            await new Promise(resolve => setTimeout(resolve, 3000))
+            const verifyResult = await payload.count({ collection: 'users' })
+            console.log('✅ Schema verified! Users count:', verifyResult.totalDocs)
+          } catch (pushError: any) {
+            console.error('❌ Manual schema push failed:', pushError.message)
+            throw pushError
+          }
+        } else {
+          throw retryError
+        }
       }
-      console.error('❌ Database query failed:', dbError.message)
-      // Don't throw - migrations might run on first request
     }
     
     console.log('✅ Payload initialized successfully')
