@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Multi-Tenant Analytics Dashboard',
-  description: 'Analytics dashboard for multi-tenant applications',
+  title: 'Hivefinty - Multi-tenant Analytics Dashboard',
+  description: 'Hivefinty Analytics Dashboard for multi-tenant applications',
 }
 
 export default function RootLayout({

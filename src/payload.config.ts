@@ -22,6 +22,18 @@ export default buildConfig({
     importMap: {
       baseDir: path.resolve(dirname),
     },
+    components: {
+      graphics: {
+        Logo: {
+          path: 'components/Logo',
+          exportName: 'Logo',
+        },
+        Icon: {
+          path: 'components/Icon',
+          exportName: 'Icon',
+        },
+      },
+    },
   },
   collections: [Users, Media, Tenants, Analytics],
   editor: lexicalEditor(),

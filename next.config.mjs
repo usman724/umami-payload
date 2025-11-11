@@ -1,4 +1,5 @@
 import { withPayload } from '@payloadcms/next/withPayload'
+import FixImportMapPlugin from './scripts/webpack-fix-importmap-plugin.js'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -20,6 +21,9 @@ const nextConfig = {
       '.js': ['.ts', '.tsx', '.js', '.jsx'],
       '.mjs': ['.mts', '.mjs'],
     }
+
+    // Add plugin to fix import map paths automatically
+    webpackConfig.plugins.push(new FixImportMapPlugin())
 
     return webpackConfig
   },
